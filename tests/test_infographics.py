@@ -98,3 +98,63 @@ async def test_failure_when_all_invalid():
         )
         result = await creator.generate(req)
         assert result.status == "FAILURE"
+
+
+@pytest.mark.asyncio
+async def test_strips_markdown_fences():
+    creator = InfographicCreator()
+    obj = {"title": "T", "specs": [{"type": "interval", "data": [{"category": "A", "value": 1}]}]}
+    fenced = "```json\n" + json.dumps(obj) + "\n```"
+    with tempfile.TemporaryDirectory() as td:
+        req = CreationRequest(
+            content=ContentBundle(text="x"),
+            models={"text": _FakeRole(provider="f", model="f", payload=fenced)},
+            output_dir=td,
+            artifact_id="a",
+        )
+        result = await creator.generate(req)
+        assert result.status == "SUCCESS"
+        assert result.data["title"] == "T"
+
+
+@pytest.mark.asyncio
+async def test_empty_specs_is_failure():
+    creator = InfographicCreator()
+    with tempfile.TemporaryDirectory() as td:
+        req = CreationRequest(
+            content=ContentBundle(text="x"),
+            models={"text": _role({"specs": []})},
+            output_dir=td,
+            artifact_id="a",
+        )
+        result = await creator.generate(req)
+        assert result.status == "FAILURE"
+
+
+@pytest.mark.asyncio
+async def test_respects_max_charts():
+    creator = InfographicCreator()
+    specs = [
+        {"type": "interval", "data": [{"category": "A", "value": i}]} for i in range(5)
+    ]
+    with tempfile.TemporaryDirectory() as td:
+        req = CreationRequest(
+            content=ContentBundle(text="x"),
+            config={"max_charts": 2},
+            models={"text": _role({"specs": specs})},
+            output_dir=td,
+            artifact_id="a",
+        )
+        result = await creator.generate(req)
+        assert result.status == "SUCCESS"
+        assert len(result.data["specs"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_no_text_role_is_failure():
+    creator = InfographicCreator()
+    with tempfile.TemporaryDirectory() as td:
+        req = CreationRequest(content=ContentBundle(text="x"), output_dir=td, artifact_id="a")
+        result = await creator.generate(req)
+        assert result.status == "FAILURE"
+        assert result.errors[0].phase == "setup"
