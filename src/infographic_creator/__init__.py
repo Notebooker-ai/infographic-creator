@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import re
 from importlib import resources
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from ai_prompter import Prompter
 from loguru import logger
@@ -29,6 +29,11 @@ _ALLOWED_TYPES = {"interval", "line", "point", "area", "bar", "rect", "cell", "t
 
 class InfographicsConfig(BaseModel):
     max_charts: int = Field(default=3, ge=1, le=8, description="Maximum charts to generate")
+    # Visual theme applied to the rendered AntV chart (client-side). "auto" follows
+    # the app's light/dark mode. Values map to G2's official theme names.
+    theme: Literal[
+        "auto", "light", "dark", "classic", "classicDark", "academy"
+    ] = Field(default="auto", description="Chart theme")
 
 
 def _strip_fences(text: str) -> str:
