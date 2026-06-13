@@ -29,7 +29,6 @@ _ALLOWED_TYPES = {"interval", "line", "point", "area", "bar", "rect", "cell", "t
 
 class InfographicsConfig(BaseModel):
     max_charts: int = Field(default=3, ge=1, le=8, description="Maximum charts to generate")
-    theme: str = Field(default="light", description="Visual theme hint (light/dark)")
 
 
 def _strip_fences(text: str) -> str:
@@ -92,7 +91,6 @@ class InfographicCreator(BaseCreator):
             {
                 "content": request.content.text,
                 "max_charts": cfg.max_charts,
-                "theme": cfg.theme,
             }
         )
         llm = role.create_language(structured={"type": "json"}, max_tokens=4000)

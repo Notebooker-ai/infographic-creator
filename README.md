@@ -19,7 +19,6 @@ content into [AntV G2](https://g2.antv.antgroup.com/) chart specs.
 | field | default | notes |
 |-------|---------|-------|
 | `max_charts` | 3 | 1–8 |
-| `theme` | "light" | visual theme hint |
 
 ## Dev
 
