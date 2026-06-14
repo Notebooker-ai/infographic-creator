@@ -22,7 +22,7 @@ from open_notebook_creator_sdk import (
 from open_notebook_creator_sdk.schemas import InfographicV1
 from pydantic import BaseModel, Field
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 _BLOCK_TYPES = {"stat", "text", "list", "quote"}
 # Fields the renderer/schema understands per block (others are dropped).
@@ -117,7 +117,11 @@ class InfographicCreator(BaseCreator):
             "infographic.jinja"
         ).read_text()
         prompt = Prompter(template_text=template).render(
-            {"content": request.content.text, "max_blocks": cfg.max_blocks}
+            {
+                "content": request.content.text,
+                "max_blocks": cfg.max_blocks,
+                "instructions": request.instructions,
+            }
         )
         llm = role.create_language(structured={"type": "json"}, max_tokens=4000)
         resp = await llm.ainvoke(prompt)

@@ -1,6 +1,6 @@
 [project]
 name = "infographic-creator"
-version = "0.2.0"
+version = "0.2.1"
 license = "MIT"
 description = "Open Notebook creator: LLM-generated infographics (infographic.v1)"
 readme = "README.md"
