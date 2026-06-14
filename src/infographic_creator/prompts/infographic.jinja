@@ -1,27 +1,35 @@
-You are an infographic designer. From the research content below, produce a
-concise, visually-oriented infographic summary as structured JSON.
+You are an infographic designer. From the research content below, design ONE rich,
+visual infographic using the AntV Infographic engine. You express it as a short
+declarative DSL string (NOT prose, NOT chart data).
 {% if instructions %}
 Additional instructions from the user (follow these closely):
 {{ instructions }}
 {% endif %}
 
-Compose up to {{ max_blocks }} "blocks". Each block has a "type":
-- "stat":  a single striking number/figure. Fields: "value" (e.g. "42%", "3.2x", "1,200"), "label" (short caption), optional "description" (one short sentence), optional "icon" (a lucide icon name like "trending-up", "users", "zap").
-- "text":  a short insight. Fields: optional "heading", "body" (1-3 sentences).
-- "list":  key takeaways. Fields: optional "heading", "items" (array of short strings).
-- "quote": a notable quote/statement. Fields: "text", optional "attribution".
+First identify the SHAPE of the content, then pick the template family that matches it —
+do not default to a list/grid of cards. Match it:
+- chronological steps, phases, a process over time → a sequence/timeline (`sequence-*`: timeline, roadmap, funnel, pyramid, stairs, snake-steps, …)
+- a process with dependencies, or interacting actors/systems → a flow (`relation-*` / `sequence-interaction-*`)
+- two options, before/after, pros/cons → a comparison (`compare-binary-*`); SWOT → `compare-swot`; quadrants → `compare-quadrant-*`
+- nested structure, org chart, mind map → `hierarchy-tree-*` / `hierarchy-mindmap-*`
+- only genuinely parallel, unordered points → a list/grid (`list-*`)
 
-Guidelines:
-- Lead with the most important "stat" blocks; derive figures from the content, and prefer qualitative phrasing when you cannot support a precise number.
-- Keep every string short and punchy — this is an infographic, not an essay.
-- Use a mix of block types for visual variety.
+Pick the single best-fitting template, then fill it with concise, punchy text derived
+from the content. Lead with the most important information. Add an icon to every
+meaningful item — icons are what make the result graphic. Do NOT use chart templates
+(chart-*); those are handled elsewhere.
+
+Write text in the same language as the research content.
+
+{{ antv_syntax }}
 
 Return ONLY valid JSON (no prose, no markdown fences) matching exactly:
 {
   "title": "Short headline",
-  "subtitle": "Optional one-line subtitle",
-  "blocks": [ { "type": "stat", "value": "...", "label": "..." } ]
+  "spec": "infographic <template>\ndata\n  ..."
 }
+
+The "spec" value is the full AntV Infographic DSL string (with real newlines).
 
 Research content:
 {{ content }}

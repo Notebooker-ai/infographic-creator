@@ -1,4 +1,4 @@
-"""Tests for InfographicCreator (infographic.v1) with a stubbed model (no network)."""
+"""Tests for InfographicCreator (infographic.v2 / AntV DSL) with a stubbed model."""
 
 from __future__ import annotations
 
@@ -11,6 +11,17 @@ from open_notebook_creator_sdk import ContentBundle, CreationRequest, ModelRole
 from open_notebook_creator_sdk.testing import (
     assert_creator_compliant,
     assert_result_compliant,
+)
+
+_SPEC = (
+    "infographic list-row-horizontal-icon-arrow\n"
+    "data\n"
+    "  title Product growth\n"
+    "  lists\n"
+    "    - label Acquire\n"
+    "      icon rocket\n"
+    "    - label Retain\n"
+    "      icon repeat\n"
 )
 
 
@@ -45,20 +56,11 @@ def test_static_compliance():
 @pytest.mark.asyncio
 async def test_generate_infographic():
     creator = InfographicCreator()
-    payload = {
-        "title": "Climate Snapshot",
-        "subtitle": "Key figures",
-        "blocks": [
-            {"type": "stat", "value": "1.5°C", "label": "Warming target", "icon": "thermometer"},
-            {"type": "text", "heading": "Why it matters", "body": "Crossing it raises risk."},
-            {"type": "list", "heading": "Drivers", "items": ["energy", "transport"]},
-            {"type": "quote", "text": "Act now.", "attribution": "IPCC"},
-        ],
-    }
+    payload = {"title": "Climate Snapshot", "spec": _SPEC}
     with tempfile.TemporaryDirectory() as td:
         req = CreationRequest(
             content=ContentBundle(text="some content"),
-            config={"max_blocks": 8},
+            config={"theme": "auto"},
             models={"text": _role(payload)},
             output_dir=td,
             artifact_id="a",
@@ -66,22 +68,18 @@ async def test_generate_infographic():
         result = await creator.generate(req)
         assert result.status == "SUCCESS"
         assert_result_compliant(creator, result)
+        assert result.schema_id == "infographic.v2"
         assert result.data["title"] == "Climate Snapshot"
-        assert len(result.data["blocks"]) == 4
+        assert result.data["spec"].startswith("infographic ")
+        assert result.data["library"] == "antv-infographic"
+        assert result.data["theme"] == "auto"
 
 
 @pytest.mark.asyncio
-async def test_partial_on_some_invalid_blocks():
+async def test_failure_when_spec_invalid():
     creator = InfographicCreator()
-    payload = {
-        "title": "Mixed",
-        "blocks": [
-            {"type": "stat", "value": "10", "label": "ok"},
-            {"type": "bogus", "value": "x"},          # invalid type
-            {"type": "text"},                          # missing body
-            {"type": "list", "items": []},             # empty items
-        ],
-    }
+    # spec does not start with "infographic "
+    payload = {"title": "T", "spec": "data\n  lists\n    - label x"}
     with tempfile.TemporaryDirectory() as td:
         req = CreationRequest(
             content=ContentBundle(text="x"),
@@ -90,35 +88,16 @@ async def test_partial_on_some_invalid_blocks():
             artifact_id="a",
         )
         result = await creator.generate(req)
-        assert result.status == "PARTIAL"
-        assert len(result.data["blocks"]) == 1
-        assert result.warnings
+        assert result.status == "FAILURE"
 
 
 @pytest.mark.asyncio
-async def test_respects_max_blocks():
-    creator = InfographicCreator()
-    blocks = [{"type": "stat", "value": str(i), "label": f"s{i}"} for i in range(10)]
-    with tempfile.TemporaryDirectory() as td:
-        req = CreationRequest(
-            content=ContentBundle(text="x"),
-            config={"max_blocks": 3},
-            models={"text": _role({"title": "T", "blocks": blocks})},
-            output_dir=td,
-            artifact_id="a",
-        )
-        result = await creator.generate(req)
-        assert result.status == "SUCCESS"
-        assert len(result.data["blocks"]) == 3
-
-
-@pytest.mark.asyncio
-async def test_failure_when_no_usable_blocks():
+async def test_failure_when_spec_missing():
     creator = InfographicCreator()
     with tempfile.TemporaryDirectory() as td:
         req = CreationRequest(
             content=ContentBundle(text="x"),
-            models={"text": _role({"title": "T", "blocks": [{"type": "bogus"}]})},
+            models={"text": _role({"title": "T"})},
             output_dir=td,
             artifact_id="a",
         )
@@ -139,7 +118,7 @@ async def test_no_text_role_is_failure():
 @pytest.mark.asyncio
 async def test_strips_markdown_fences():
     creator = InfographicCreator()
-    obj = {"title": "T", "blocks": [{"type": "stat", "value": "1", "label": "x"}]}
+    obj = {"title": "T", "spec": _SPEC}
     fenced = "```json\n" + json.dumps(obj) + "\n```"
     with tempfile.TemporaryDirectory() as td:
         req = CreationRequest(

@@ -1,7 +1,9 @@
 """infographic-creator: an Open Notebook creator that turns notebook content into
-a composed, designed infographic (emitted as ``infographic.v1``, rendered
-client-side as themed stat/text/list/quote cards). Data charts live in
-chart-creator (``chart_spec.v1``); infographics here contain no charts.
+a rich, illustrated infographic. The LLM designs it as an AntV Infographic DSL
+string (emitted as ``infographic.v2``, rendered client-side to SVG by the
+``@antv/infographic`` engine). This creator uses the non-chart templates
+(sequence/list/compare/hierarchy/relation); ``chart-*`` templates are produced by
+chart-creator. Earlier versions emitted ``infographic.v1`` stat/text/list/quote cards.
 """
 
 import json
@@ -19,33 +21,17 @@ from open_notebook_creator_sdk import (
     CreatorManifest,
     ModelRoleSpec,
 )
-from open_notebook_creator_sdk.schemas import InfographicV1
+from open_notebook_creator_sdk.schemas import InfographicV2
 from pydantic import BaseModel, Field
 
-__version__ = "0.2.1"
-
-_BLOCK_TYPES = {"stat", "text", "list", "quote"}
-# Fields the renderer/schema understands per block (others are dropped).
-_BLOCK_FIELDS = {
-    "type",
-    "value",
-    "label",
-    "description",
-    "icon",
-    "heading",
-    "body",
-    "items",
-    "text",
-    "attribution",
-}
+__version__ = "0.3.0"
 
 
 class InfographicsConfig(BaseModel):
-    max_blocks: int = Field(
-        default=8, ge=1, le=20, description="Maximum infographic blocks"
-    )
-    # Layout theme applied client-side; "auto" follows the app's light/dark mode.
-    theme: Literal["auto", "light", "dark"] = Field(
+    # AntV Infographic theme applied client-side. "auto" follows the app's
+    # light/dark mode; "hand-drawn" is a sketchy preset. The DSL's own palette
+    # still layers colour on top of the base theme.
+    theme: Literal["auto", "light", "dark", "hand-drawn"] = Field(
         default="auto", description="Infographic theme"
     )
 
@@ -58,24 +44,17 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def _clean_block(block: object) -> dict | None:
-    """Validate/normalize one block; return None if unusable."""
-    if not isinstance(block, dict):
-        return None
-    btype = block.get("type")
-    if btype not in _BLOCK_TYPES:
-        return None
-    cleaned = {k: v for k, v in block.items() if k in _BLOCK_FIELDS}
-    # Require the minimum field(s) per type to be meaningful.
-    if btype == "stat" and not (cleaned.get("value") or cleaned.get("label")):
-        return None
-    if btype == "text" and not cleaned.get("body"):
-        return None
-    if btype == "list" and not (isinstance(cleaned.get("items"), list) and cleaned["items"]):
-        return None
-    if btype == "quote" and not cleaned.get("text"):
-        return None
-    return cleaned
+def _valid_spec(spec: object) -> bool:
+    """A usable AntV Infographic DSL: a non-empty string whose first non-blank
+    line starts with ``infographic ``. The DSL itself is the contract; we keep
+    validation loose so new AntV templates need no code change."""
+    if not isinstance(spec, str):
+        return False
+    for line in spec.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped.startswith("infographic ")
+    return False
 
 
 class InfographicCreator(BaseCreator):
@@ -87,9 +66,9 @@ class InfographicCreator(BaseCreator):
             key="infographics",
             name="Infographics",
             version=__version__,
-            description="LLM-generated infographic of key stats, insights, and quotes.",
+            description="LLM-designed AntV infographic of the key story in the content.",
             sdk_compat=">=0.2,<1",
-            emits=["infographic.v1"],
+            emits=["infographic.v2"],
             model_roles=[
                 ModelRoleSpec(
                     key="text",
@@ -107,23 +86,23 @@ class InfographicCreator(BaseCreator):
         if role is None:
             return CreationResult(
                 status="FAILURE",
-                schema_id="infographic.v1",
+                schema_id="infographic.v2",
                 data={},
                 errors=[CreationError(phase="setup", message="missing 'text' model role")],
                 user_message="No language model was provided for infographic generation.",
             )
 
-        template = resources.files("infographic_creator.prompts").joinpath(
-            "infographic.jinja"
-        ).read_text()
+        prompts = resources.files("infographic_creator.prompts")
+        template = prompts.joinpath("infographic.jinja").read_text()
+        antv_syntax = prompts.joinpath("antv_syntax.md").read_text()
         prompt = Prompter(template_text=template).render(
             {
                 "content": request.content.text,
-                "max_blocks": cfg.max_blocks,
+                "antv_syntax": antv_syntax,
                 "instructions": request.instructions,
             }
         )
-        llm = role.create_language(structured={"type": "json"}, max_tokens=4000)
+        llm = role.create_language(structured={"type": "json"}, max_tokens=6000)
         resp = await llm.ainvoke(prompt)
         raw = resp.content if hasattr(resp, "content") else str(resp)
         try:
@@ -132,53 +111,31 @@ class InfographicCreator(BaseCreator):
             logger.error(f"infographics: non-JSON response: {e}")
             return CreationResult(
                 status="FAILURE",
-                schema_id="infographic.v1",
+                schema_id="infographic.v2",
                 data={},
                 errors=[CreationError(phase="parse", message=f"invalid JSON: {e}", retryable=True)],
                 user_message="The model returned an unparseable response. Please retry.",
             )
 
-        if not isinstance(parsed, dict):
+        spec = parsed.get("spec") if isinstance(parsed, dict) else None
+        if not _valid_spec(spec):
             return CreationResult(
                 status="FAILURE",
-                schema_id="infographic.v1",
+                schema_id="infographic.v2",
                 data={},
-                errors=[CreationError(phase="generate", message="response was not an object")],
+                errors=[CreationError(phase="generate", message="no valid infographic spec", retryable=True)],
                 user_message="No infographic could be generated from this content.",
             )
-
-        raw_blocks = parsed.get("blocks", []) if isinstance(parsed.get("blocks"), list) else []
-        good = [b for b in (_clean_block(b) for b in raw_blocks) if b]
-        dropped = len(raw_blocks) - len(good)
-        good = good[: cfg.max_blocks]
-
-        warnings: list[str] = []
-        errors: list[CreationError] = []
-        if dropped > 0:
-            warnings.append(f"Dropped {dropped} invalid block(s).")
-            errors.append(CreationError(phase="validate", message=f"{dropped} invalid blocks"))
 
         title = parsed.get("title")
-        if not good or not isinstance(title, str) or not title.strip():
-            return CreationResult(
-                status="FAILURE",
-                schema_id="infographic.v1",
-                data={},
-                warnings=warnings,
-                errors=errors or [CreationError(phase="generate", message="no usable blocks/title")],
-                user_message="No infographic could be generated from this content.",
-            )
-
-        data = InfographicV1(
-            title=title,
-            subtitle=parsed.get("subtitle") if isinstance(parsed.get("subtitle"), str) else None,
-            blocks=good,
+        data = InfographicV2(
+            title=title if isinstance(title, str) and title.strip() else None,
+            spec=spec.strip(),
+            theme=cfg.theme,
         ).model_dump()
 
         return CreationResult(
-            status="PARTIAL" if errors else "SUCCESS",
-            schema_id="infographic.v1",
+            status="SUCCESS",
+            schema_id="infographic.v2",
             data=data,
-            warnings=warnings,
-            errors=errors,
         )

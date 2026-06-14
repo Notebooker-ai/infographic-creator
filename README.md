@@ -1,11 +1,13 @@
 # infographic-creator
 
 An [Open Notebook](https://open-notebook.ai) **creator** plugin: turns notebook
-content into a composed **infographic** — a themed poster of key-stat cards,
-insight text, bulleted takeaways, and quotes.
+content into a rich, illustrated **infographic**. The LLM designs it as an
+[AntV Infographic](https://infographic.antv.vision/) DSL string, rendered
+client-side to SVG by the `@antv/infographic` engine.
 
-- Emits the `infographic.v1` artifact schema (rendered client-side; PNG/SVG export).
-- No charts — data charts live in [`chart-creator`](https://github.com/Notebooker-ai/chart-creator) (`chart_spec.v1`).
+- Emits the `infographic.v2` artifact schema (rendered client-side; PNG/SVG export).
+- Uses the non-chart templates (sequence / list / compare / hierarchy / relation);
+  `chart-*` templates are produced by [`chart-creator`](https://github.com/Notebooker-ai/chart-creator) (also `infographic.v2`).
 - Implements the [`open-notebook-creator-sdk`](https://github.com/Notebooker-ai/open-notebook-creator-sdk) `BaseCreator` contract; registers under `open_notebook.creators`.
 
 ## Model roles
@@ -18,8 +20,7 @@ insight text, bulleted takeaways, and quotes.
 
 | field | default | notes |
 |-------|---------|-------|
-| `max_blocks` | 8 | 1–20 |
-| `theme` | "auto" | auto/light/dark |
+| `theme` | "auto" | auto/light/dark/hand-drawn (AntV theme) |
 
 ## Dev
 
