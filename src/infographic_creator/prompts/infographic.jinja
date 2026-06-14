@@ -1,25 +1,22 @@
-You are a data-visualization expert producing specs for the AntV G2 (v5) library.
-From the research content below, design {{ max_charts }} chart(s) that best
-summarize the key quantitative insights.
+You are an infographic designer. From the research content below, produce a
+concise, visually-oriented infographic summary as structured JSON.
 
-Each chart is a G2 v5 spec object passed directly to `chart.options(spec)`. Use
-this minimal, reliable structure per chart:
-{
-  "type": "interval" | "line" | "point" | "area",
-  "data": [ {"category": "...", "value": 12.3}, ... ],
-  "encode": {"x": "category", "y": "value"{% if false %}{% endif %}},
-  "axis": {"x": {"title": "..."}, "y": {"title": "..."}}
-}
+Compose up to {{ max_blocks }} "blocks". Each block has a "type":
+- "stat":  a single striking number/figure. Fields: "value" (e.g. "42%", "3.2x", "1,200"), "label" (short caption), optional "description" (one short sentence), optional "icon" (a lucide icon name like "trending-up", "users", "zap").
+- "text":  a short insight. Fields: optional "heading", "body" (1-3 sentences).
+- "list":  key takeaways. Fields: optional "heading", "items" (array of short strings).
+- "quote": a notable quote/statement. Fields: "text", optional "attribution".
 
-Rules:
-- Put the actual data points inline in each chart's "data" array (derive them from the content; do not invent precise figures you cannot support — prefer qualitative/relative values when unsure).
-- Keep each chart focused on one comparison.
-- Use "interval" for category comparisons, "line"/"area" for trends over an ordered axis, "point" for correlations.
+Guidelines:
+- Lead with the most important "stat" blocks; derive figures from the content, and prefer qualitative phrasing when you cannot support a precise number.
+- Keep every string short and punchy — this is an infographic, not an essay.
+- Use a mix of block types for visual variety.
 
 Return ONLY valid JSON (no prose, no markdown fences) matching exactly:
 {
-  "title": "Short overall title",
-  "specs": [ { ...g2 spec... } ]
+  "title": "Short headline",
+  "subtitle": "Optional one-line subtitle",
+  "blocks": [ { "type": "stat", "value": "...", "label": "..." } ]
 }
 
 Research content:

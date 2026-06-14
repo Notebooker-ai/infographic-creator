@@ -1,8 +1,8 @@
 [project]
 name = "infographic-creator"
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT"
-description = "Open Notebook creator: LLM-generated AntV chart specs (chart_spec.v1)"
+description = "Open Notebook creator: LLM-generated infographics (infographic.v1)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

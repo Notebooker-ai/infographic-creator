@@ -1,11 +1,11 @@
 # infographic-creator
 
 An [Open Notebook](https://open-notebook.ai) **creator** plugin: turns notebook
-content into [AntV G2](https://g2.antv.antgroup.com/) chart specs.
+content into a composed **infographic** — a themed poster of key-stat cards,
+insight text, bulleted takeaways, and quotes.
 
-- Emits the `chart_spec.v1` artifact schema (rendered client-side by `@antv/g2`).
-- Partial-failure aware: invalid specs are dropped with a warning; the artifact
-  still renders the valid charts.
+- Emits the `infographic.v1` artifact schema (rendered client-side; PNG/SVG export).
+- No charts — data charts live in [`chart-creator`](https://github.com/Notebooker-ai/chart-creator) (`chart_spec.v1`).
 - Implements the [`open-notebook-creator-sdk`](https://github.com/Notebooker-ai/open-notebook-creator-sdk) `BaseCreator` contract; registers under `open_notebook.creators`.
 
 ## Model roles
@@ -18,7 +18,8 @@ content into [AntV G2](https://g2.antv.antgroup.com/) chart specs.
 
 | field | default | notes |
 |-------|---------|-------|
-| `max_charts` | 3 | 1–8 |
+| `max_blocks` | 8 | 1–20 |
+| `theme` | "auto" | auto/light/dark |
 
 ## Dev
 

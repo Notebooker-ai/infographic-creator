@@ -1,8 +1,8 @@
 """infographic-creator: an Open Notebook creator that turns notebook content into
-AntV G2 chart specs (emitted as ``chart_spec.v1``, rendered client-side).
+a composed, designed infographic (emitted as ``infographic.v1``, rendered
+client-side as themed stat/text/list/quote cards). Data charts live in
+chart-creator (``chart_spec.v1``); infographics here contain no charts.
 """
-
-from __future__ import annotations
 
 import json
 import re
@@ -19,21 +19,35 @@ from open_notebook_creator_sdk import (
     CreatorManifest,
     ModelRoleSpec,
 )
-from open_notebook_creator_sdk.schemas import ChartSpecV1
+from open_notebook_creator_sdk.schemas import InfographicV1
 from pydantic import BaseModel, Field
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
-_ALLOWED_TYPES = {"interval", "line", "point", "area", "bar", "rect", "cell", "text"}
+_BLOCK_TYPES = {"stat", "text", "list", "quote"}
+# Fields the renderer/schema understands per block (others are dropped).
+_BLOCK_FIELDS = {
+    "type",
+    "value",
+    "label",
+    "description",
+    "icon",
+    "heading",
+    "body",
+    "items",
+    "text",
+    "attribution",
+}
 
 
 class InfographicsConfig(BaseModel):
-    max_charts: int = Field(default=3, ge=1, le=8, description="Maximum charts to generate")
-    # Visual theme applied to the rendered AntV chart (client-side). "auto" follows
-    # the app's light/dark mode. Values map to G2's official theme names.
-    theme: Literal[
-        "auto", "light", "dark", "classic", "classicDark", "academy"
-    ] = Field(default="auto", description="Chart theme")
+    max_blocks: int = Field(
+        default=8, ge=1, le=20, description="Maximum infographic blocks"
+    )
+    # Layout theme applied client-side; "auto" follows the app's light/dark mode.
+    theme: Literal["auto", "light", "dark"] = Field(
+        default="auto", description="Infographic theme"
+    )
 
 
 def _strip_fences(text: str) -> str:
@@ -44,14 +58,24 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-def _valid_spec(spec: object) -> bool:
-    if not isinstance(spec, dict):
-        return False
-    t = spec.get("type")
-    if not isinstance(t, str) or t not in _ALLOWED_TYPES:
-        return False
-    data = spec.get("data")
-    return isinstance(data, list) and len(data) > 0
+def _clean_block(block: object) -> dict | None:
+    """Validate/normalize one block; return None if unusable."""
+    if not isinstance(block, dict):
+        return None
+    btype = block.get("type")
+    if btype not in _BLOCK_TYPES:
+        return None
+    cleaned = {k: v for k, v in block.items() if k in _BLOCK_FIELDS}
+    # Require the minimum field(s) per type to be meaningful.
+    if btype == "stat" and not (cleaned.get("value") or cleaned.get("label")):
+        return None
+    if btype == "text" and not cleaned.get("body"):
+        return None
+    if btype == "list" and not (isinstance(cleaned.get("items"), list) and cleaned["items"]):
+        return None
+    if btype == "quote" and not cleaned.get("text"):
+        return None
+    return cleaned
 
 
 class InfographicCreator(BaseCreator):
@@ -63,18 +87,18 @@ class InfographicCreator(BaseCreator):
             key="infographics",
             name="Infographics",
             version=__version__,
-            description="LLM-generated AntV chart specs rendered in the browser.",
-            sdk_compat=">=0.1,<1",
-            emits=["chart_spec.v1"],
+            description="LLM-generated infographic of key stats, insights, and quotes.",
+            sdk_compat=">=0.2,<1",
+            emits=["infographic.v1"],
             model_roles=[
                 ModelRoleSpec(
                     key="text",
                     kind="language",
                     requires=["structured_json"],
-                    description="LLM that designs the chart specs.",
+                    description="LLM that designs the infographic.",
                 )
             ],
-            icon="bar-chart-3",
+            icon="layout-dashboard",
         )
 
     async def generate(self, request: CreationRequest) -> CreationResult:
@@ -83,7 +107,7 @@ class InfographicCreator(BaseCreator):
         if role is None:
             return CreationResult(
                 status="FAILURE",
-                schema_id="chart_spec.v1",
+                schema_id="infographic.v1",
                 data={},
                 errors=[CreationError(phase="setup", message="missing 'text' model role")],
                 user_message="No language model was provided for infographic generation.",
@@ -93,10 +117,7 @@ class InfographicCreator(BaseCreator):
             "infographic.jinja"
         ).read_text()
         prompt = Prompter(template_text=template).render(
-            {
-                "content": request.content.text,
-                "max_charts": cfg.max_charts,
-            }
+            {"content": request.content.text, "max_blocks": cfg.max_blocks}
         )
         llm = role.create_language(structured={"type": "json"}, max_tokens=4000)
         resp = await llm.ainvoke(prompt)
@@ -107,41 +128,52 @@ class InfographicCreator(BaseCreator):
             logger.error(f"infographics: non-JSON response: {e}")
             return CreationResult(
                 status="FAILURE",
-                schema_id="chart_spec.v1",
+                schema_id="infographic.v1",
                 data={},
                 errors=[CreationError(phase="parse", message=f"invalid JSON: {e}", retryable=True)],
                 user_message="The model returned an unparseable response. Please retry.",
             )
 
-        all_specs = parsed.get("specs", []) if isinstance(parsed, dict) else []
-        good = [s for s in all_specs if _valid_spec(s)]
-        dropped = len(all_specs) - len(good)
-        good = good[: cfg.max_charts]
+        if not isinstance(parsed, dict):
+            return CreationResult(
+                status="FAILURE",
+                schema_id="infographic.v1",
+                data={},
+                errors=[CreationError(phase="generate", message="response was not an object")],
+                user_message="No infographic could be generated from this content.",
+            )
+
+        raw_blocks = parsed.get("blocks", []) if isinstance(parsed.get("blocks"), list) else []
+        good = [b for b in (_clean_block(b) for b in raw_blocks) if b]
+        dropped = len(raw_blocks) - len(good)
+        good = good[: cfg.max_blocks]
 
         warnings: list[str] = []
         errors: list[CreationError] = []
         if dropped > 0:
-            warnings.append(f"Dropped {dropped} invalid chart spec(s).")
-            errors.append(CreationError(phase="validate", message=f"{dropped} invalid specs"))
+            warnings.append(f"Dropped {dropped} invalid block(s).")
+            errors.append(CreationError(phase="validate", message=f"{dropped} invalid blocks"))
 
-        if not good:
+        title = parsed.get("title")
+        if not good or not isinstance(title, str) or not title.strip():
             return CreationResult(
                 status="FAILURE",
-                schema_id="chart_spec.v1",
+                schema_id="infographic.v1",
                 data={},
                 warnings=warnings,
-                errors=errors or [CreationError(phase="generate", message="no valid charts")],
-                user_message="No valid charts could be generated from this content.",
+                errors=errors or [CreationError(phase="generate", message="no usable blocks/title")],
+                user_message="No infographic could be generated from this content.",
             )
 
-        data = ChartSpecV1(
-            title=parsed.get("title") if isinstance(parsed, dict) else None,
-            specs=good,
+        data = InfographicV1(
+            title=title,
+            subtitle=parsed.get("subtitle") if isinstance(parsed.get("subtitle"), str) else None,
+            blocks=good,
         ).model_dump()
 
         return CreationResult(
             status="PARTIAL" if errors else "SUCCESS",
-            schema_id="chart_spec.v1",
+            schema_id="infographic.v1",
             data=data,
             warnings=warnings,
             errors=errors,

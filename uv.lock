@@ -244,7 +244,7 @@ wheels = [
 
 [[package]]
 name = "infographic-creator"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "ai-prompter" },
@@ -469,8 +469,8 @@ wheels = [
 
 [[package]]
 name = "open-notebook-creator-sdk"
-version = "0.1.0"
-source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#bd9d4f9fc8bfc0efeb18be295a6dfc2cfb972020" }
+version = "0.2.0"
+source = { git = "https://github.com/Notebooker-ai/open-notebook-creator-sdk.git?branch=main#4eaf2b1bb5a756c2b18a017c64918cef99d9ad8b" }
 dependencies = [
     { name = "packaging" },
     { name = "pydantic" },
