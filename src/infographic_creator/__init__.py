@@ -19,12 +19,13 @@ from open_notebook_creator_sdk import (
     CreationRequest,
     CreationResult,
     CreatorManifest,
+    CreatorView,
     ModelRoleSpec,
 )
 from open_notebook_creator_sdk.schemas import InfographicV2
 from pydantic import BaseModel, Field
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 
 class InfographicsConfig(BaseModel):
@@ -74,7 +75,7 @@ class InfographicCreator(BaseCreator):
             name="Infographics",
             version=__version__,
             description="LLM-designed AntV infographic of the key story in the content.",
-            sdk_compat=">=0.2,<1",
+            sdk_compat=">=0.4,<1",
             emits=["infographic.v2"],
             model_roles=[
                 ModelRoleSpec(
@@ -85,6 +86,7 @@ class InfographicCreator(BaseCreator):
                 )
             ],
             icon="layout-dashboard",
+            view=CreatorView(entry="view/index.html"),
         )
 
     async def generate(self, request: CreationRequest) -> CreationResult:

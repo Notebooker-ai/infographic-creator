@@ -130,3 +130,23 @@ async def test_strips_markdown_fences():
         result = await creator.generate(req)
         assert result.status == "SUCCESS"
         assert result.data["title"] == "T"
+
+
+def test_manifest_declares_view_bundle_and_it_ships():
+    """The creator owns its UI: the manifest points at a shipped HTML view bundle
+    that is self-contained (offline) and renders every schema we've emitted."""
+    from importlib import resources
+
+    m = InfographicCreator().manifest
+    assert m.view is not None
+    assert m.view.entry == "view/index.html"
+    asset = resources.files("infographic_creator").joinpath(m.view.entry)
+    assert asset.is_file()
+    html = asset.read_text()
+    # self-contained + speaks the host handshake + dispatches both schemas
+    assert "open-notebook:ready" in html
+    assert "open-notebook:artifact" in html
+    assert "infographic.v2" in html
+    assert "infographic.v1" in html
+    # inline <script> blocks are fine; what must NOT appear is any external fetch.
+    assert 'src="http' not in html
