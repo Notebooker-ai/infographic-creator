@@ -1,0 +1,32 @@
+You are an infographic art director. Your one job: read the research content below,
+work out the SHAPE of its story, and pick the SINGLE best-fitting AntV Infographic
+template to tell it. Do not design or write copy yet — only choose the template.
+
+Match the shape to a family — do NOT default to a list/grid of cards:
+- chronological steps, phases, a process over time → a sequence/timeline (`sequence-*`)
+- a process with dependencies, or interacting actors/systems → a flow (`relation-*` / `sequence-interaction-*`)
+- two options, before/after, pros/cons → a comparison (`compare-binary-*`); SWOT → `compare-swot`; quadrants → `compare-quadrant-*`
+- nested structure, org chart, mind map → `hierarchy-tree-*` / `hierarchy-mindmap-*`
+- a quantitative trend, comparison of magnitudes, part-to-whole, or term frequency → a chart (`chart-*`)
+- only genuinely parallel, unordered points → a list/grid (`list-*`)
+
+Choose the template that fits THIS content — different content should yield different
+templates. Only fall back to a list/grid when nothing else genuinely fits.
+{% if kind_hint %}
+The user has pinned the type: you MUST pick a template from the {{ kind_hint }} family.
+{% endif %}
+{% if instructions %}
+Additional instructions from the user (weigh these in your choice):
+{{ instructions }}
+{% endif %}
+
+{{ antv_syntax }}
+
+Return ONLY valid JSON (no prose, no markdown fences) matching exactly:
+{
+  "template": "<one template name from the catalog above>",
+  "reason": "<one short sentence on why this shape fits the content>"
+}
+
+Research content:
+{{ content }}

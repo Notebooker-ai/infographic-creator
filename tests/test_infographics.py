@@ -49,6 +49,21 @@ def _role(obj):
     return _FakeRole(provider="f", model="f", payload=json.dumps(obj))
 
 
+class _SeqRole(ModelRole):
+    """Returns a different payload for each successive create_language() call, so
+    the two-phase (select then design) flow can be driven end to end."""
+
+    payloads: list = []
+
+    def create_language(self, **_):
+        payload = self.payloads.pop(0) if self.payloads else "{}"
+        return _FakeLLM(payload)
+
+
+def _seq_role(*objs):
+    return _SeqRole(provider="f", model="f", payloads=[json.dumps(o) for o in objs])
+
+
 def test_static_compliance():
     assert_creator_compliant(InfographicCreator())
 
@@ -130,6 +145,74 @@ async def test_strips_markdown_fences():
         result = await creator.generate(req)
         assert result.status == "SUCCESS"
         assert result.data["title"] == "T"
+
+
+def test_config_schema_has_kind_dropdown_and_help_link():
+    """The Type dropdown defaults to Auto, covers charts, and carries a gallery
+    help link the host renders next to the field."""
+    m = InfographicCreator().manifest
+    kind = m.config_schema["properties"]["kind"]
+    assert kind["default"] == "auto"
+    assert "auto" in kind["enum"] and "chart" in kind["enum"]
+    assert kind["x-help-url"] == "https://infographic.antv.vision/gallery"
+    assert kind["x-help-label"]
+
+
+def test_antv_syntax_includes_chart_templates():
+    from importlib import resources
+
+    txt = resources.files("infographic_creator.prompts").joinpath("antv_syntax.md").read_text()
+    assert "chart-column-simple" in txt
+    assert "chart-wordcloud" in txt
+    assert "chart-pie-donut-plain-text" in txt
+
+
+@pytest.mark.asyncio
+async def test_two_phase_selects_then_designs():
+    """Phase 1 picks a template; phase 2 fills it into a valid spec."""
+    creator = InfographicCreator()
+    select = {"template": "sequence-timeline-simple", "reason": "steps over time"}
+    spec = (
+        "infographic sequence-timeline-simple\n"
+        "data\n  title Release\n  sequences\n"
+        "    - label Scope\n      icon clipboard\n"
+    )
+    design = {"title": "Release", "spec": spec}
+    with tempfile.TemporaryDirectory() as td:
+        req = CreationRequest(
+            content=ContentBundle(text="phase 1 then phase 2, then ship"),
+            config={"kind": "auto"},
+            models={"text": _seq_role(select, design)},
+            output_dir=td,
+            artifact_id="a",
+        )
+        result = await creator.generate(req)
+        assert result.status == "SUCCESS"
+        assert result.data["spec"].startswith("infographic sequence-timeline-simple")
+
+
+@pytest.mark.asyncio
+async def test_kind_chart_produces_chart_spec():
+    creator = InfographicCreator()
+    select = {"template": "chart-column-simple", "reason": "compare magnitudes"}
+    spec = (
+        "infographic chart-column-simple\n"
+        "data\n  title Revenue by region\n  values\n"
+        "    - label North\n      value 120\n"
+        "    - label South\n      value 90\n"
+    )
+    design = {"title": "Revenue", "spec": spec}
+    with tempfile.TemporaryDirectory() as td:
+        req = CreationRequest(
+            content=ContentBundle(text="north 120, south 90"),
+            config={"kind": "chart"},
+            models={"text": _seq_role(select, design)},
+            output_dir=td,
+            artifact_id="a",
+        )
+        result = await creator.generate(req)
+        assert result.status == "SUCCESS"
+        assert result.data["spec"].startswith("infographic chart-")
 
 
 def test_manifest_declares_view_bundle_and_it_ships():

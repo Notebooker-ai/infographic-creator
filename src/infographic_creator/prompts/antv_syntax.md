@@ -1,6 +1,7 @@
-AntV Infographic DSL — syntax & template catalog (non-chart templates).
+AntV Infographic DSL — syntax & template catalog (non-chart templates + charts).
 Adapted from AntV Infographic's `infographic-creator` skill (MIT, v0.2.x,
 https://github.com/antvis/Infographic). Refresh via AntV's `infographic-template-updater` skill.
+Browse every template visually at https://infographic.antv.vision/gallery.
 
 ## Grammar
 
@@ -147,10 +148,82 @@ data
     API - read/write -> db
 ```
 
+## Chart templates (quantitative data)
+
+Use these when the story is a number: a trend, a magnitude comparison, a
+part-to-whole split, or term frequency. Charts use a different grammar from the
+templates above — one `values` series, bare numbers, and NO icons.
+
+### Chart grammar
+
+- First line: `infographic chart-<template-name>`.
+- The single main data field is `values`: one ordered series of points.
+  - Each point uses `label` for the category/word and `value` for the number.
+  - `value` is a bare number; put units in `title`/`desc`.
+  - Line/bar/column order follows the order of the `values` entries.
+- `title` and optional `desc` are top-level data fields. Do NOT add `icon` to chart points.
+- Derive numbers from the content; prefer qualitative/relative values when you cannot support precise figures.
+
+### Available chart templates
+
+charts: chart-line-plain-text, chart-bar-plain-text, chart-column-simple, chart-pie-plain-text, chart-pie-compact-card, chart-pie-donut-plain-text, chart-pie-donut-pill-badge, chart-pie-donut-compact-card, chart-pie-pill-badge, chart-wordcloud, chart-wordcloud-rotate
+
+- Trend / change over an ordered sequence → `chart-line-plain-text`
+- Compare quantities across categories → `chart-column-simple` (vertical) or `chart-bar-plain-text` (horizontal)
+- Share of a total / proportions → `chart-pie-*` / `chart-pie-donut-*`
+- Relative frequency of terms/themes → `chart-wordcloud` / `chart-wordcloud-rotate`
+
+### Chart examples
+
+column:
+```
+infographic chart-column-simple
+data
+  title Revenue by region
+  values
+    - label North
+      value 120
+    - label South
+      value 90
+    - label East
+      value 75
+    - label West
+      value 110
+```
+
+pie:
+```
+infographic chart-pie-donut-plain-text
+data
+  title Traffic sources
+  values
+    - label Organic
+      value 52
+    - label Paid
+      value 28
+    - label Referral
+      value 20
+```
+
+wordcloud:
+```
+infographic chart-wordcloud
+data
+  title Key themes
+  values
+    - label resilience
+      value 40
+    - label recovery
+      value 32
+    - label aid
+      value 25
+```
+
 ## Self-check before output
 
 - First line is `infographic <template-name>`.
-- Exactly one main data field, matching the template family.
-- Every meaningful item has an `icon` (semantic phrase, spaces not hyphens).
+- Exactly one main data field, matching the template family (`values` for `chart-*`).
+- Every meaningful item has an `icon` (semantic phrase, spaces not hyphens) — EXCEPT `chart-*` points, which have none.
 - `palette` values are bare hex (no quotes/commas).
 - `compare-binary-*` has exactly two roots, each with `children`; every child has `label`.
+- `chart-*` uses one `values` series with a bare numeric `value` per point.
