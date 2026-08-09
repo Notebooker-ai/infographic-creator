@@ -149,6 +149,11 @@ class InfographicCreator(BaseCreator):
             ],
             icon="layout-dashboard",
             view=CreatorView(entry="view/index.html"),
+            suggestion_hint=(
+                "which key facts, numbers, and comparisons to highlight visually, how "
+                "to group them, and whether the story is a list, timeline, comparison, "
+                "hierarchy, or flow"
+            ),
         )
 
     async def _select_template(
