@@ -233,3 +233,33 @@ def test_manifest_declares_view_bundle_and_it_ships():
     assert "infographic.v1" in html
     # inline <script> blocks are fine; what must NOT appear is any external fetch.
     assert 'src="http' not in html
+
+
+def test_cap_label_lengths_truncates_at_word_boundary():
+    from infographic_creator import _cap_label_lengths
+
+    long_label = "A very long label that keeps going well past the forty-eight character backstop"
+    spec = "infographic list-row-simple\ndata\n  lists\n    - label " + long_label + "\n      desc ok"
+    capped = _cap_label_lengths(spec)
+    line = [l for l in capped.splitlines() if "label" in l][0]
+    value = line.split("label ", 1)[1]
+    assert value.endswith("…")
+    assert len(value) <= 49
+    assert not value[:-1].endswith(" ")  # cut at a word boundary, no trailing space
+
+
+def test_cap_label_lengths_leaves_short_text_alone():
+    from infographic_creator import _cap_label_lengths
+
+    spec = "infographic list-row-simple\ndata\n  lists\n    - label Short\n      desc Also short"
+    assert _cap_label_lengths(spec) == spec
+
+
+def test_cap_label_lengths_caps_desc_at_ninety():
+    from infographic_creator import _cap_label_lengths
+
+    spec = "infographic list-row-simple\ndata\n  lists\n    - label Ok\n      desc " + ("word " * 30).strip()
+    capped = _cap_label_lengths(spec)
+    desc_line = [l for l in capped.splitlines() if "desc" in l][0]
+    assert desc_line.endswith("…")
+    assert len(desc_line.split("desc ", 1)[1]) <= 91

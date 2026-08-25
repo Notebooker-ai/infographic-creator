@@ -692,6 +692,28 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
     "infographic.v1": renderInfographicV1,
   };
 
+  // The DSL's own `data > title` renders inside the SVG; drawing data.title as
+  // an HTML heading too doubles the headline.
+  function specHasTitle(spec) {
+    return /^\s{2}title\s+\S/m.test(spec);
+  }
+
+  // An ultra-wide layout (a flat mindmap/flow) scaled to card width collapses
+  // into a ~20px strip. Render those at natural size and let the card scroll
+  // horizontally instead of squashing.
+  function fixFlatStrip(el) {
+    var svg = el.querySelector("svg");
+    if (!svg) return;
+    var vb = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+    if (vb.length !== 4 || !(vb[2] > 0) || !(vb[3] > 0)) return;
+    if (vb[2] / vb[3] > 3) {
+      el.style.overflowX = "auto";
+      svg.setAttribute("width", vb[2] + "px");
+      svg.setAttribute("height", vb[3] + "px");
+      svg.style.maxWidth = "none";
+    }
+  }
+
   // infographic.v2: { title?, spec (AntV DSL), theme? } -> AntV Infographic SVG.
   function renderInfographicV2(data, theme) {
     root.innerHTML = "";
@@ -700,7 +722,7 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
       root.innerHTML = '<div class="empty">This infographic has no spec.</div>';
       return;
     }
-    if (data.title) {
+    if (data.title && !specHasTitle(spec)) {
       var h = document.createElement("h3");
       h.className = "title";
       h.textContent = data.title;
@@ -717,11 +739,12 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
     }
     var ig = new lib.Infographic({ container: el, width: "100%", theme: theme });
     ig.render(spec);
+    fixFlatStrip(el);
     // Text metrics depend on fonts; re-render once they are ready so labels lay
     // out correctly (mirrors AntV's own usage guidance).
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () {
-        try { ig.render(spec); } catch (e) {}
+        try { ig.render(spec); fixFlatStrip(el); } catch (e) {}
       }).catch(function () {});
     }
   }
@@ -787,7 +810,10 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
       return;
     }
     try { r(msg.data || {}, theme); }
-    catch (e) { root.innerHTML = '<div class="empty">Failed to render this artifact.</div>'; }
+    catch (e) {
+      var detail = e && e.message ? " (" + esc(e.message) + ")" : "";
+      root.innerHTML = '<div class="empty">Failed to render this artifact.' + detail + "</div>";
+    }
   }
 
   window.addEventListener("message", function (e) {

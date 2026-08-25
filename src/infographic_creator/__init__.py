@@ -28,7 +28,7 @@ from open_notebook_creator_sdk import (
 from open_notebook_creator_sdk.schemas import InfographicV2
 from pydantic import BaseModel, Field
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 # AntV Infographic gallery — browsable catalog of every template/chart type.
 GALLERY_URL = "https://infographic.antv.vision/gallery"
@@ -125,6 +125,31 @@ def _spec_template(spec: object) -> Optional[str]:
             parts = stripped.split()
             return parts[1] if len(parts) >= 2 and parts[0] == "infographic" else None
     return None
+
+
+# AntV templates render text into fixed-geometry slots, so an overlong label
+# paints over its neighbours. The prompt asks for short text; these are the
+# hard backstops applied to whatever comes back.
+_LABEL_CAP = 48
+_DESC_CAP = 90
+_CAPPED_KEYS = {"label": _LABEL_CAP, "desc": _DESC_CAP}
+_CAP_LINE_RE = re.compile(r"^(\s*(?:-\s+)?)(label|desc)(\s+)(.+)$")
+
+
+def _cap_label_lengths(spec: str) -> str:
+    """Truncate over-cap ``label``/``desc`` values at a word boundary."""
+
+    def cap_line(match: "re.Match[str]") -> str:
+        prefix, key, sep, value = match.groups()
+        cap = _CAPPED_KEYS[key]
+        if len(value) <= cap:
+            return match.group(0)
+        cut = value[:cap]
+        if " " in cut:
+            cut = cut[: cut.rfind(" ")]
+        return f"{prefix}{key}{sep}{cut.rstrip(',;:')}…"
+
+    return "\n".join(_CAP_LINE_RE.sub(cap_line, line) for line in spec.splitlines())
 
 
 class InfographicCreator(BaseCreator):
@@ -270,7 +295,7 @@ class InfographicCreator(BaseCreator):
         title = parsed.get("title")
         data = InfographicV2(
             title=title if isinstance(title, str) and title.strip() else None,
-            spec=spec.strip(),
+            spec=_cap_label_lengths(spec.strip()),
             theme=cfg.theme,
         ).model_dump()
 

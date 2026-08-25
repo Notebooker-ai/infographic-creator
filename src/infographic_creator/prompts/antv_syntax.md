@@ -11,6 +11,8 @@ Browse every template visually at https://infographic.antv.vision/gallery.
 - Put exactly ONE main data field that matches the template family (do not mix `lists`/`sequences`/`compares`/`root`/`nodes`/`items`).
 - `title` and `desc` are optional top-level data fields.
 - `value` should be a bare number; put units in `label` or `desc`.
+- Keep `label` under ~28 characters (2–5 words) and `desc` under ~60 characters —
+  templates render text into fixed slots, and overlong text paints over neighbours.
 
 ### Icons (use them — they make infographics graphic)
 
@@ -162,7 +164,10 @@ templates above — one `values` series, bare numbers, and NO icons.
   - `value` is a bare number; put units in `title`/`desc`.
   - Line/bar/column order follows the order of the `values` entries.
 - `title` and optional `desc` are top-level data fields. Do NOT add `icon` to chart points.
-- Derive numbers from the content; prefer qualitative/relative values when you cannot support precise figures.
+- HONESTY: every `value` must be a number the content states or that is directly
+  countable from it. NEVER invent scores, percentages, or estimates — if the content
+  has no genuine quantities, do not pick a `chart-*` template at all; use a
+  non-chart family instead.
 
 ### Available chart templates
 
