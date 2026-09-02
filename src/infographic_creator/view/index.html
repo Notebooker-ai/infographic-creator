@@ -714,6 +714,38 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
     }
   }
 
+  // AntV lays each label out in a <foreignObject> whose height it computes from
+  // its own text measurement, then renders the real text inside it. When the
+  // measurement comes out narrower than the eventual render — different font,
+  // or metrics taken before the webfont applied — the text wraps to a line the
+  // box has no room for and spills over whatever sits underneath. On a 557px
+  // card the title "Campaign to Poitiers" was allotted 35px, needed 67px, and
+  // its second line landed on top of the subtitle.
+  //
+  // Rather than re-flow AntV's layout, shrink the text that overflows until it
+  // fits the box reserved for it. Long labels come out a little smaller; the
+  // layout stays exactly where AntV put it, and nothing lands on anything else.
+  function fitForeignText(el) {
+    var svg = el.querySelector("svg");
+    if (!svg) return;
+    var nodes = svg.querySelectorAll("foreignObject");
+    for (var i = 0; i < nodes.length; i++) {
+      var fo = nodes[i];
+      var box = parseFloat(fo.getAttribute("height"));
+      var node = fo.firstElementChild;
+      if (!(box > 0) || !node) continue;
+      var size = parseFloat(getComputedStyle(node).fontSize);
+      if (!(size > 0)) continue;
+      // Never shrink so far that the label stops being readable; a label that
+      // still does not fit at the floor is better small than overlapping.
+      var min = Math.max(9, size * 0.6);
+      for (var step = 0; step < 8 && node.scrollHeight > box + 1 && size > min; step++) {
+        size = Math.max(min, size * Math.sqrt(box / node.scrollHeight));
+        node.style.fontSize = size + "px";
+      }
+    }
+  }
+
   // infographic.v2: { title?, spec (AntV DSL), theme? } -> AntV Infographic SVG.
   function renderInfographicV2(data, theme) {
     root.innerHTML = "";
@@ -740,11 +772,12 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
     var ig = new lib.Infographic({ container: el, width: "100%", theme: theme });
     ig.render(spec);
     fixFlatStrip(el);
+    fitForeignText(el);
     // Text metrics depend on fonts; re-render once they are ready so labels lay
     // out correctly (mirrors AntV's own usage guidance).
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () {
-        try { ig.render(spec); fixFlatStrip(el); } catch (e) {}
+        try { ig.render(spec); fixFlatStrip(el); fitForeignText(el); } catch (e) {}
       }).catch(function () {});
     }
   }

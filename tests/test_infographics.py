@@ -235,6 +235,25 @@ def test_manifest_declares_view_bundle_and_it_ships():
     assert 'src="http' not in html
 
 
+def test_view_bundle_fits_overflowing_labels():
+    """AntV sizes each label's <foreignObject> from its own text measurement and
+    then renders the real text inside it. When the render wraps to a line the box
+    has no room for, the overflow lands on whatever is underneath — on a 557px
+    card the title was given 35px, needed 67px, and covered the subtitle.
+
+    The view shrinks text that overflows its box, on the first render and again
+    after fonts settle (which is when the measurement most often goes stale)."""
+    from importlib import resources
+
+    html = resources.files("infographic_creator").joinpath("view/index.html").read_text()
+    assert "function fitForeignText" in html
+    # Runs on both render paths, not just the first.
+    assert html.count("fitForeignText(el)") >= 2
+    # Shrinks against the box AntV reserved, and stops at a readable floor.
+    assert "scrollHeight > box + 1" in html
+    assert "Math.max(9, size * 0.6)" in html
+
+
 def test_cap_label_lengths_truncates_at_word_boundary():
     from infographic_creator import _cap_label_lengths
 
