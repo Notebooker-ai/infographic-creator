@@ -725,6 +725,20 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
   // Rather than re-flow AntV's layout, shrink the text that overflows until it
   // fits the box reserved for it. Long labels come out a little smaller; the
   // layout stays exactly where AntV put it, and nothing lands on anything else.
+  // Fitting has to be re-checked, not done once. AntV measures, renders, and
+  // the wrap that overflows often only appears a beat later when the webfont
+  // applies — at which point a fit that already ran saw nothing wrong. Running
+  // it again on a short schedule is idempotent: once the text fits, every
+  // later pass is a no-op.
+  function scheduleFit(el) {
+    fitForeignText(el);
+    [150, 600, 1500].forEach(function (ms) {
+      setTimeout(function () {
+        try { fitForeignText(el); } catch (e) {}
+      }, ms);
+    });
+  }
+
   function fitForeignText(el) {
     var svg = el.querySelector("svg");
     if (!svg) return;
@@ -772,12 +786,12 @@ https://www.w3ctech.com/topic/2226`));let O=_(...$);return O.postcssPlugin=x,O.p
     var ig = new lib.Infographic({ container: el, width: "100%", theme: theme });
     ig.render(spec);
     fixFlatStrip(el);
-    fitForeignText(el);
+    scheduleFit(el);
     // Text metrics depend on fonts; re-render once they are ready so labels lay
     // out correctly (mirrors AntV's own usage guidance).
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () {
-        try { ig.render(spec); fixFlatStrip(el); fitForeignText(el); } catch (e) {}
+        try { ig.render(spec); fixFlatStrip(el); scheduleFit(el); } catch (e) {}
       }).catch(function () {});
     }
   }

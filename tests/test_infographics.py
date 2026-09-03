@@ -248,7 +248,11 @@ def test_view_bundle_fits_overflowing_labels():
     html = resources.files("infographic_creator").joinpath("view/index.html").read_text()
     assert "function fitForeignText" in html
     # Runs on both render paths, not just the first.
-    assert html.count("fitForeignText(el)") >= 2
+    assert html.count("scheduleFit(el)") >= 2
+    # And re-checks after the first pass: the wrap that overflows usually only
+    # appears once the webfont applies, by which time a single fit has already
+    # run and seen nothing wrong.
+    assert "[150, 600, 1500]" in html
     # Shrinks against the box AntV reserved, and stops at a readable floor.
     assert "scrollHeight > box + 1" in html
     assert "Math.max(9, size * 0.6)" in html
